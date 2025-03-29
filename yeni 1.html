@@ -1,0 +1,193 @@
+<script>
+    const map = document.getElementById('map');
+    const questionDiv = document.getElementById('question');
+    const input = document.getElementById('input');
+    const submitBtn = document.getElementById('submit');
+    const nameInput = document.getElementById('nameInput');
+    const scoresDiv = document.getElementById('scores');
+    const timerDiv = document.getElementById('timer');
+    const correctSound = document.getElementById('correctSound');
+    const wrongSound = document.getElementById('wrongSound');
+    const backgroundMusic = document.getElementById('backgroundMusic');
+
+    let currentPosition = 0;
+    const totalTiles = 20; // Toplam 20 soru
+    let playerName = '';
+    let score = 0;
+    let time = 0;
+    let correctAnswers = 0;
+    let wrongAnswers = 0;
+    let timerInterval;
+    const scoreboard = [];
+
+    // Temalar
+    const themes = {
+        forest: {
+            background: '#87CEEB',
+            map: '#228B22',
+            tile: '#8B4513',
+        },
+        space: {
+            background: '#000033',
+            map: '#1a1a1a',
+            tile: '#333333',
+        },
+        ocean: {
+            background: '#0077be',
+            map: '#005f73',
+            tile: '#0a9396',
+        }
+    };
+
+    // Varsayılan tema
+    let currentTheme = 'forest';
+    applyTheme(currentTheme);
+
+    // Temayı uygula
+    function applyTheme(theme) {
+        document.body.style.backgroundColor = themes[theme].background;
+        map.style.backgroundColor = themes[theme].map;
+        const tiles = document.querySelectorAll('.tile');
+        tiles.forEach(tile => {
+            tile.style.backgroundColor = themes[theme].tile;
+        });
+    }
+
+    // Arka plan müziğini başlat
+    backgroundMusic.play();
+
+    // Haritayı oluştur
+    function createMap() {
+        for (let i = 0; i < totalTiles; i++) {
+            const tile = document.createElement('div');
+            tile.classList.add('tile');
+            if (i === totalTiles - 1) {
+                tile.classList.add('castle');
+                tile.textContent = '🏰';
+            }
+            map.appendChild(tile);
+        }
+    }
+
+    // Soru oluştur (negatif sonuç olmayacak)
+    function generateQuestion() {
+        const operators = ['+', '-'];
+        const operator = operators[Math.floor(Math.random() * operators.length)];
+        let num1, num2;
+
+        if (operator === '+') {
+            num1 = Math.floor(Math.random() * 100) + 1;
+            num2 = Math.floor(Math.random() * 100) + 1;
+        } else {
+            num1 = Math.floor(Math.random() * 100) + 1;
+            num2 = Math.floor(Math.random() * num1) + 1; // Küçük sayıdan büyük sayı çıkar
+        }
+
+        const question = `${num1} ${operator} ${num2}`;
+        const answer = eval(question).toFixed(2); // İki ondalık basamağa yuvarla
+        return { question, answer };
+    }
+
+    // Oyuncuyu ilerlet
+    function movePlayer(isCorrect) {
+        const tiles = document.querySelectorAll('.tile');
+        tiles[currentPosition].classList.remove('active');
+        if (isCorrect) {
+            tiles[currentPosition].classList.add('active'); // Doğru cevap: Yeşil
+            correctAnswers++;
+        } else {
+            tiles[currentPosition].classList.add('wrong'); // Yanlış cevap: Kırmızı
+            wrongAnswers++;
+        }
+        currentPosition++;
+
+        if (currentPosition === totalTiles) {
+            clearInterval(timerInterval);
+            alert(`Tebrikler ${playerName}! Şatoya ulaştın ve oyunu ${time} saniyede bitirdin!`);
+            updateScoreboard();
+            resetGame();
+        } else {
+            askQuestion(); // Yeni soru sor
+        }
+    }
+
+    // Puan tablosunu güncelle
+    function updateScoreboard() {
+        scoreboard.push({
+            name: playerName,
+            time: `${time} saniye`,
+            correct: correctAnswers,
+            wrong: wrongAnswers
+        });
+        // Puan tablosunu süreye göre sırala (en hızlı üstte)
+        scoreboard.sort((a, b) => a.time - b.time);
+        scoresDiv.innerHTML = scoreboard
+            .map((entry, index) => `
+                <p>
+                    ${index + 1}. ${entry.name}<br>
+                    Süre: ${entry.time}<br>
+                    Doğru: ${entry.correct}, Yanlış: ${entry.wrong}
+                </p>
+            `)
+            .join('');
+    }
+
+    // Oyunu sıfırla
+    function resetGame() {
+        currentPosition = 0;
+        score = 0;
+        time = 0;
+        correctAnswers = 0;
+        wrongAnswers = 0;
+        clearInterval(timerInterval);
+        timerDiv.textContent = "Süre: 0 saniye";
+        const tiles = document.querySelectorAll('.tile');
+        tiles.forEach(tile => tile.classList.remove('active', 'wrong'));
+        tiles[0].classList.add('active');
+        nameInput.value = '';
+        nameInput.style.display = 'block';
+        askQuestion();
+    }
+
+    // Soru sor
+    function askQuestion() {
+        const { question, answer } = generateQuestion();
+        questionDiv.textContent = `Soru: ${question} = ?`;
+
+        submitBtn.onclick = () => {
+            const newName = nameInput.value.trim();
+            if (!newName) {
+                alert("Lütfen isminizi girin!");
+                return;
+            }
+
+            // Yeni isim girildiğinde zamanlayıcıyı sıfırla ve başlat
+            if (newName !== playerName) {
+                playerName = newName;
+                clearInterval(timerInterval); // Önceki zamanlayıcıyı temizle
+                time = 0; // Zamanı sıfırla
+                timerDiv.textContent = `Süre: ${time} saniye`; // Zamanı güncelle
+                timerInterval = setInterval(() => {
+                    time++;
+                    timerDiv.textContent = `Süre: ${time} saniye`;
+                }, 1000); // Yeni zamanlayıcıyı başlat
+            }
+
+            const userAnswer = parseFloat(input.value).toFixed(2);
+            if (userAnswer == answer) {
+                score += 10;
+                correctSound.play();
+                movePlayer(true); // Doğru cevap
+            } else {
+                wrongSound.play();
+                movePlayer(false); // Yanlış cevap
+            }
+            input.value = '';
+        };
+    }
+
+    // Oyunu başlat
+    createMap();
+    askQuestion();
+    document.querySelectorAll('.tile')[0].classList.add('active');
+</script>
